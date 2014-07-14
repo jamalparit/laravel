@@ -1512,7 +1512,12 @@ class Request
             }
         }
         if ($host = $this->headers->get('HOST')) {
-            if (false !== ($pos = strrpos($host, ':'))) {
+            if ($host[0] === '[') {
+                $pos = strpos($host, ':', strrpos($host, ']'));
+            } else {
+                $pos = strrpos($host, ':');
+            }
+            if (false !== $pos) {
                 return intval(substr($host, $pos + 1));
             }
             return 'https' === $this->getScheme() ? 443 : 80;
@@ -1521,11 +1526,11 @@ class Request
     }
     public function getUser()
     {
-        return $this->server->get('PHP_AUTH_USER');
+        return $this->headers->get('PHP_AUTH_USER');
     }
     public function getPassword()
     {
-        return $this->server->get('PHP_AUTH_PW');
+        return $this->headers->get('PHP_AUTH_PW');
     }
     public function getUserInfo()
     {
@@ -1577,7 +1582,8 @@ class Request
         if (self::$trustedProxies && self::$trustedHeaders[self::HEADER_CLIENT_PROTO] && ($proto = $this->headers->get(self::$trustedHeaders[self::HEADER_CLIENT_PROTO]))) {
             return in_array(strtolower(current(explode(',', $proto))), array('https', 'on', 'ssl', '1'));
         }
-        return 'on' == strtolower($this->server->get('HTTPS')) || 1 == $this->server->get('HTTPS');
+        $https = $this->server->get('HTTPS');
+        return !empty($https) && 'off' !== strtolower($https);
     }
     public function getHost()
     {
@@ -2683,7 +2689,8 @@ class ExceptionHandler
     private $debug;
     private $charset;
     private $handler;
-    private $caughtOutput = 0;
+    private $caughtBuffer;
+    private $caughtLength;
     public function __construct($debug = true, $charset = 'UTF-8')
     {
         $this->debug = $debug;
@@ -2697,7 +2704,7 @@ class ExceptionHandler
     }
     public function setHandler($handler)
     {
-        if (isset($handler) && !is_callable($handler)) {
+        if (null !== $handler && !is_callable($handler)) {
             throw new \LogicException('The exception handler must be a valid PHP callable.');
         }
         $old = $this->handler;
@@ -2706,44 +2713,39 @@ class ExceptionHandler
     }
     public function handle(\Exception $exception)
     {
-        if ($exception instanceof OutOfMemoryException) {
-            $this->sendPhpResponse($exception);
+        if (null === $this->handler || $exception instanceof OutOfMemoryException) {
+            $this->failSafeHandle($exception);
             return;
         }
-        $caughtOutput = 0;
-        $this->caughtOutput = false;
+        $caughtLength = $this->caughtLength = 0;
         ob_start(array($this, 'catchOutput'));
-        try {
-            if (class_exists('Symfony\\Component\\HttpFoundation\\Response')) {
-                $response = $this->createResponse($exception);
-                $response->sendHeaders();
-                $response->sendContent();
-            } else {
-                $this->sendPhpResponse($exception);
-            }
-        } catch (\Exception $e) {
+        $this->failSafeHandle($exception);
+        while (null === $this->caughtBuffer && ob_end_flush()) {
             
         }
-        if (false === $this->caughtOutput) {
-            ob_end_clean();
-        }
-        if (isset($this->caughtOutput[0])) {
+        if (isset($this->caughtBuffer[0])) {
             ob_start(array($this, 'cleanOutput'));
-            echo $this->caughtOutput;
-            $caughtOutput = ob_get_length();
+            echo $this->caughtBuffer;
+            $caughtLength = ob_get_length();
         }
-        $this->caughtOutput = 0;
-        if (!empty($this->handler)) {
-            try {
-                call_user_func($this->handler, $exception);
-                if ($caughtOutput) {
-                    $this->caughtOutput = $caughtOutput;
-                }
-            } catch (\Exception $e) {
-                if (!$caughtOutput) {
-                    throw $exception;
-                }
+        $this->caughtBuffer = null;
+        try {
+            call_user_func($this->handler, $exception);
+            $this->caughtLength = $caughtLength;
+        } catch (\Exception $e) {
+            if (!$caughtLength) {
+                throw $exception;
             }
+        }
+    }
+    private function failSafeHandle(\Exception $exception)
+    {
+        if (class_exists('Symfony\\Component\\HttpFoundation\\Response', false)) {
+            $response = $this->createResponse($exception);
+            $response->sendHeaders();
+            $response->sendContent();
+        } else {
+            $this->sendPhpResponse($exception);
         }
     }
     public function sendPhpResponse($exception)
@@ -2907,13 +2909,13 @@ class ExceptionHandler
     }
     public function catchOutput($buffer)
     {
-        $this->caughtOutput = $buffer;
+        $this->caughtBuffer = $buffer;
         return '';
     }
     public function cleanOutput($buffer)
     {
-        if ($this->caughtOutput) {
-            $cleanBuffer = substr_replace($buffer, '', 0, $this->caughtOutput);
+        if ($this->caughtLength) {
+            $cleanBuffer = substr_replace($buffer, '', 0, $this->caughtLength);
             if (isset($cleanBuffer[0])) {
                 $buffer = $cleanBuffer;
             }
