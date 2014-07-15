@@ -15,3 +15,5 @@ Route::get('/', function()
 {
 	return View::make('guest.index');
 });
+
+Route::get('/dashboard', 'HomeController@dashboard');
