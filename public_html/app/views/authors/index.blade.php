@@ -1,0 +1,1 @@
+/home/adminfinance/public_html/app/views/authors/index.blade.php
