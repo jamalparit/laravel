@@ -9585,27 +9585,30 @@ class Response
         $headers = $this->headers;
         if ($this->isInformational() || in_array($this->statusCode, array(204, 304))) {
             $this->setContent(null);
-        }
-        if (!$headers->has('Content-Type')) {
-            $format = $request->getRequestFormat();
-            if (null !== $format && ($mimeType = $request->getMimeType($format))) {
-                $headers->set('Content-Type', $mimeType);
-            }
-        }
-        $charset = $this->charset ?: 'UTF-8';
-        if (!$headers->has('Content-Type')) {
-            $headers->set('Content-Type', 'text/html; charset=' . $charset);
-        } elseif (0 === stripos($headers->get('Content-Type'), 'text/') && false === stripos($headers->get('Content-Type'), 'charset')) {
-            $headers->set('Content-Type', $headers->get('Content-Type') . '; charset=' . $charset);
-        }
-        if ($headers->has('Transfer-Encoding')) {
+            $headers->remove('Content-Type');
             $headers->remove('Content-Length');
-        }
-        if ($request->isMethod('HEAD')) {
-            $length = $headers->get('Content-Length');
-            $this->setContent(null);
-            if ($length) {
-                $headers->set('Content-Length', $length);
+        } else {
+            if (!$headers->has('Content-Type')) {
+                $format = $request->getRequestFormat();
+                if (null !== $format && ($mimeType = $request->getMimeType($format))) {
+                    $headers->set('Content-Type', $mimeType);
+                }
+            }
+            $charset = $this->charset ?: 'UTF-8';
+            if (!$headers->has('Content-Type')) {
+                $headers->set('Content-Type', 'text/html; charset=' . $charset);
+            } elseif (0 === stripos($headers->get('Content-Type'), 'text/') && false === stripos($headers->get('Content-Type'), 'charset')) {
+                $headers->set('Content-Type', $headers->get('Content-Type') . '; charset=' . $charset);
+            }
+            if ($headers->has('Transfer-Encoding')) {
+                $headers->remove('Content-Length');
+            }
+            if ($request->isMethod('HEAD')) {
+                $length = $headers->get('Content-Length');
+                $this->setContent(null);
+                if ($length) {
+                    $headers->set('Content-Length', $length);
+                }
             }
         }
         if ('HTTP/1.0' != $request->server->get('SERVER_PROTOCOL')) {
