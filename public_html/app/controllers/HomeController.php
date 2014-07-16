@@ -31,4 +31,32 @@ class HomeController extends BaseController {
  	{	
 	 $this->layout->content = View::make('dashboard.index')->withTitle('Dashboard');
  	}	
+
+	public function authenticate()
+	{	
+		// Ambil credentials dari $_POST variable
+		$credentials = array(
+		'email' => Input::get('email'),
+		'password' => Input::get('password'),
+		);
+	try {
+		// authentikasi user
+		$user = Sentry::authenticate($credentials, false);
+		// Redirect user ke dashboard
+		return Redirect::to('dashboard');
+		} catch (Exception $e) {
+		// kembalikan user ke halaman sebelumnya (login)
+		return Redirect::back();
+		}		
+	}	
+	
+	public function logout()
+	{		
+		// Logout user
+		Sentry::logout();
+		// Redirect user ke halaman login
+		// Asal - return Redirect::to('login');
+		return Redirect::to('login')->with('successMessage', 'Anda berhasil logout.');
+	}	
+
 }

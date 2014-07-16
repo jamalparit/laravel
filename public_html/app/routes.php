@@ -17,3 +17,6 @@ Route::get('/', function()
 });
 
 Route::get('/dashboard', 'HomeController@dashboard');
+Route::get('login', array('guest.login', 'uses'=>'GuestController@login'));
+Route::post('authenticate', 'HomeController@authenticate');
+Route::get('logout', 'HomeController@logout');
