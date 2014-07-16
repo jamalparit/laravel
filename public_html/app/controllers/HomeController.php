@@ -43,7 +43,7 @@ class HomeController extends BaseController {
 		// authentikasi user
 		$user = Sentry::authenticate($credentials, false);
 		// Redirect user ke dashboard
-		return Redirect::to('dashboard');
+		return Redirect::intended('dashboard');
 		} catch (Exception $e) {
 		// kembalikan user ke halaman sebelumnya (login)
 		return Redirect::back();

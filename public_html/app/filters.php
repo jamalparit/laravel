@@ -35,6 +35,7 @@ App::after(function($request, $response)
 
 Route::filter('auth', function()
 {
+/* -- Asal -
 	if (Auth::guest())
 	{
 		if (Request::ajax())
@@ -46,7 +47,16 @@ Route::filter('auth', function()
 			return Redirect::guest('login');
 		}
 	}
+}); */
+
+{
+if ( !Sentry::check() )
+{
+return Redirect::guest('login')->with('errorMessage', 'Silahkan login terlebih dahulu.');
+}
+}
 });
+
 
 
 Route::filter('auth.basic', function()
